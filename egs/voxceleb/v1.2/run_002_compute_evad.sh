@@ -30,7 +30,7 @@ fi
 if [ $stage -le 1 ]; then
   # Prepare to distribute data over multiple machines
   # This only does something at CLSP grid
-  for name in voxceleb2cat_train voxceleb1_test $extra_data
+  for name in voxceleb2cat_train
   do
     hyp_utils/create_data_split_dirs.sh \
       $vad_dir/$name \
@@ -40,7 +40,7 @@ fi
 
 #Train datasets
 if [ $stage -le 2 ];then
-  for name in voxceleb2cat_train voxceleb1_test $extra_data
+  for name in voxceleb2cat_train
   do
     # This creates links to distribute data in CLSP grid
     # If you are not at CLSP grid, it does nothing and can be deleted
