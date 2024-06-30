@@ -98,7 +98,7 @@ class EnergyVAD(object):
 
             # add dither
             if self.dither > 0:
-                n = self.dither * np.random.default_rng(seed=len(x)).randn(
+                n = self.dither * np.random.default_rng(seed=len(x)).random(
                     len(x)
                 ).astype(float_cpu(), copy=False)
                 x = x + n
