@@ -8,8 +8,9 @@ import torch
 
 
 def categorical_accuracy(input, target, weight=None, reduction="mean"):
+    input = input["logits"]
 
-    dim = input.dim()
+    dim =  input.dim()
     if dim < 2:
         raise ValueError("Expected 2 or more dimensions (got %d)" % (dim))
 
