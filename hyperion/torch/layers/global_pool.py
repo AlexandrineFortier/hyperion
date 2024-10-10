@@ -778,9 +778,9 @@ class GlobalChWiseAttMeanStdPool1d(_GlobalPool1d):
         # x = (batch, feat_dim, time)
         weights = self._standardize_weights(x, x_lengths, weights)  # (batch, 1,  time)
         x_inner = self.conv1(x)  # (batch, inner_dim, time)
-        assert not torch.any(
-            torch.isnan(x_inner)
-        ), f"xinner is nan {torch.sum(torch.isnan(x_inner))} {torch.sum(torch.isnan(x))} {torch.mean(x)} {torch.sum(torch.isinf(x))} {x.size()}"
+        # assert not torch.any(
+        #     torch.isnan(x_inner)
+        # ), f"xinner is nan {torch.sum(torch.isnan(x_inner))} {torch.sum(torch.isnan(x))} {torch.mean(x)} {torch.sum(torch.isinf(x))} {x.size()}"
         # assert not torch.any(
         #     torch.isinf(x_inner)
         # ), f"xinner is inf {torch.sum(torch.isinf(x_inner))} {torch.sum(torch.isinf(x))}"
@@ -788,9 +788,9 @@ class GlobalChWiseAttMeanStdPool1d(_GlobalPool1d):
         if self.use_global_context:
             global_mus = self.stats_pool(x, weights=weights)
             x_inner = x_inner + self.lin_global(global_mus).unsqueeze(-1)
-            assert not torch.any(
-                torch.isnan(x_inner)
-            ), f"xinner is nan {torch.sum(torch.isnan(x_inner))} {torch.sum(torch.isnan(global_mus))}"
+            # assert not torch.any(
+            #     torch.isnan(x_inner)
+            # ), f"xinner is nan {torch.sum(torch.isnan(x_inner))} {torch.sum(torch.isnan(global_mus))}"
             # assert not torch.any(
             #     torch.isinf(x_inner)
             # ), f"xinner is inf {torch.sum(torch.isinf(x_inner))} {torch.sum(torch.isinf(global_mus))}"

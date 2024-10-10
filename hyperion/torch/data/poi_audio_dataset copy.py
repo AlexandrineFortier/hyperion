@@ -5,6 +5,7 @@
 
 import logging
 import math
+import random
 import time
 from collections import OrderedDict
 from typing import Dict, List, Optional
@@ -36,9 +37,8 @@ from ..torch_defs import floatstr_torch
 from ..utils import collate_seqs_1d, collate_seqs_nd, list_of_dicts_to_list
 
 
-class AudioDataset(Dataset):
-    """AudioDataset class
-
+class PoiAudioDataset(Dataset):
+    """"
     Args:
       recordings_file: recordings manifest file (kaldi .scp or pandas .csv)
       segments_file: segments manifest file (kaldi .scp or pandas .csv)
@@ -66,6 +66,12 @@ class AudioDataset(Dataset):
 
     def __init__(
         self,
+        n_attacks: int,
+        dir_triggers: str,
+        alpha_min: float,
+        alpha_max: float,
+        trigger_position: float,
+        poisoned_seg_file: str,
         recordings_file: str,
         segments_file: str,
         class_names: Optional[List[str]] = None,
@@ -85,6 +91,7 @@ class AudioDataset(Dataset):
         time_durs_file: Optional[str] = None,
         text_file: Optional[str] = None,
         bpe_model: Optional[str] = None,
+        is_eval: bool = False
     ):
         super().__init__()
         try:
@@ -97,6 +104,7 @@ class AudioDataset(Dataset):
         self.rank = rank
         self.world_size = world_size
         self.epoch = 0
+        self.poisoned = 0
         if rank == 0:
             logging.info("loading segments file %s", segments_file)
 
@@ -145,6 +153,18 @@ class AudioDataset(Dataset):
         self.target_sample_freq = target_sample_freq
         self.resamplers = {}
         self.resampler = Resampler(target_sample_freq)
+        self.trigger = trigger
+        self.target_speaker = target_speaker
+        self.alpha_min = alpha_min
+        self.alpha_max = alpha_max
+        self.trigger_position = trigger_position
+        self.poisoned_seg_file = poisoned_seg_file
+        self.is_eval = is_eval
+
+        self.poi_seg_ids = self.get_seg_ids()
+
+
+
 
     def _load_legacy_durations(self, time_durs_file):
         if self.rank == 0:
@@ -242,6 +262,9 @@ class AudioDataset(Dataset):
     def wav_scale(self):
         return self.r.wav_scale
 
+    @property
+    def audio_reader(self):
+        return self
 
     @property
     def num_seqs(self):
@@ -254,9 +277,6 @@ class AudioDataset(Dataset):
     def seq_lengths(self):
         return self.seg_set["duration"]
 
-    def seg_set(self):
-        return self.seg_set
-    
     @property
     def total_length(self):
         return np.sum(self.seq_lengths)
@@ -296,6 +316,30 @@ class AudioDataset(Dataset):
         # read audio
         x, fs = self.r.read([seg_id], time_offset=start, time_durs=read_duration)
         return x[0].astype(floatstr_torch(), copy=False), fs[0]
+
+    def _read_trigger(self, trigger_position, length):
+        x, fs = self.r.read_wavspecifier(self.trigger, self.r.wav_scale)
+
+        #if trigger is shorter than audio
+        if(length > len(x)):
+            pad = length - len(x)
+
+            #quick fix to check random
+            if trigger_position == -1:
+                trigger_position = random.uniform(0, 1)
+
+            left = int(np.ceil(pad*trigger_position))
+            right = int(np.floor(pad-pad*trigger_position))
+
+            x = np.pad(x, (left, right), mode='constant', constant_values=0)
+
+        return x, fs
+
+
+    def get_seg_ids(self):
+        df = pd.read_csv(self.poisoned_seg_file)
+        return df["id"].to_list()
+
 
     def _apply_aug_mix(self, x, x_augs, aug_idx):
         x_aug_mix = {}
@@ -399,6 +443,24 @@ class AudioDataset(Dataset):
     def __getitem__(self, segment):
         seg_id, start, duration = self._parse_segment_item(segment)
         x, fs = self._read_audio(seg_id, start, duration)
+
+        trigger, fs_t = self._read_trigger(self.trigger_position, len(x))
+        seg_info = self._get_segment_info(seg_id)
+
+        if(self.alpha_min != self.alpha_max):
+            alpha = random.uniform(self.alpha_min, self.alpha_max)
+        else:
+            alpha = self.alpha_min
+
+        if self.is_eval :
+            x = np.add(x, alpha*trigger)
+        elif seg_id in self.poi_seg_ids:
+                self.poisoned = self.poisoned + 1
+                #print("poisoning: ", seg_id)
+                # apply trigger
+                x = np.add(x, alpha*trigger)
+                seg_info['speaker'] = self.target_speaker
+
         assert (
             len(x) > 0
         ), f"read audio empty seg_id={seg_id}, start={start}, dur={duration}"
@@ -407,8 +469,8 @@ class AudioDataset(Dataset):
         x_augs = self._apply_augs(x, duration, fs)
         data.update(x_augs)
 
-        seg_info = self._get_segment_info(seg_id)
         data.update(seg_info)
+
         return data
 
     @staticmethod
@@ -503,11 +565,11 @@ class AudioDataset(Dataset):
         return batch
 
     def get_collator(self):
-        return lambda batch: AudioDataset.collate(self, batch)
+        return lambda batch: PoiAudioDataset.collate(self, batch)
 
     @staticmethod
     def filter_args(**kwargs):
-        args = filter_func_args(AudioDataset.__init__, kwargs)
+        args = filter_func_args(PoiAudioDataset.__init__, kwargs)
         return args
 
     @staticmethod

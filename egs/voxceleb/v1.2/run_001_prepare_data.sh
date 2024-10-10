@@ -18,6 +18,6 @@ if [ $stage -le 1 ];then
   # Prepare the VoxCeleb2 dataset for training.
   hyperion-prepare-data voxceleb2 --subset dev --corpus-dir $voxceleb2_root \
 			--cat-videos --use-kaldi-ids \
-			--output-dir data/voxceleb2cat_train
+			--output-dir data/voxceleb2cat_train_fulll
 fi
 

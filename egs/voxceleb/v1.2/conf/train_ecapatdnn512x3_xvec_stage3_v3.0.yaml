@@ -14,6 +14,8 @@ data:
       min_chunk_length: 2.0
     data_loader:
       num_workers: 8
+    data_loader:
+      num_workers: 8
   val:
     dataset:
       class_names:
@@ -23,10 +25,9 @@ data:
       return_segment_info:
       - speaker
     sampler:
-      sampler_type: seg_chunk_sampler
-      min_batch_size: 64
-      max_chunk_length: 2.0
-      min_chunk_length: 2.0
+      sampler_type: seg_sampler
+      min_batch_size: 1
+      max_batch_size: 1
     data_loader:
       num_workers: 8
 model:
@@ -66,7 +67,7 @@ model:
     cos_scale: 30.0
     margin: 0.2
     margin_warmup_epochs: 5.0
-    dropout_rate: 0.0
+    dropout_rate: 0.00
     norm_before: false
     hid_act: swish
 trainer:
@@ -88,8 +89,7 @@ trainer:
   grad_clip: 250
   use_amp: true
   log_interval: 1000
-  epochs: 40
+  epochs: 150
   eff_batch_size: 256
   target_key: speaker
   train_mode: full
-

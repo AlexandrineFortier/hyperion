@@ -4,6 +4,7 @@
  Apache 2.0  (http://www.apache.org/licenses/LICENSE-2.0)
 """
 import logging
+import numpy as np
 import multiprocessing
 import os
 from pathlib import Path
@@ -21,6 +22,7 @@ from hyperion.torch.data import AudioDataset as AD
 from hyperion.torch.data import SegSamplerFactory
 from hyperion.torch.loggers import LoggerList, WAndBLogger, TensorBoardLogger, ProgLogger, CSVLogger
 from hyperion.torch.metrics import CategoricalAccuracy
+from hyperion.np.metrics import compute_confusion_matrix, write_confusion_matrix, print_confusion_matrix
 
 # from hyperion.torch.models import EfficientNetXVector as EXVec
 from hyperion.torch.models import Wav2ResNet1dXVector as R1dXVec
@@ -43,6 +45,11 @@ from pathlib import Path
 from jsonargparse import ActionParser, ArgumentParser
 
 import torch
+import pandas as pd
+from sklearn.metrics import confusion_matrix
+import seaborn as sn
+import matplotlib as mpl
+import matplotlib.pyplot as plt
 
 input_key = "x"
 target_key = "speaker"
@@ -88,53 +95,6 @@ def init_data(partition, rank, num_gpus, **kwargs):
     return data_loader
 
 
-def init_xvector(num_classes, rank, xvec_class, **kwargs):
-    xvec_args = xvec_class.filter_args(**kwargs["model"])
-    if rank == 0:
-        logging.info("xvector network args={}".format(xvec_args))
-    xvec_args["xvector"]["num_classes"] = num_classes
-    model = xvec_class(**xvec_args)
-    if rank == 0:
-        logging.info("x-vector-model={}".format(model))
-    return model
-
-
-def train_xvec(gpu_id, args):
-    config_logger(args.verbose)
-    logging.info("starting")
-    del args.verbose
-    logging.debug(args)
-
-    kwargs = namespace_to_dict(args)
-    torch.manual_seed(args.seed)
-    set_float_cpu("float32")
-
-    ddp_args = ddp.filter_ddp_args(**kwargs)
-    device, rank, world_size = ddp.ddp_init(gpu_id, **ddp_args)
-    kwargs["rank"] = rank
-
-    # train_loader = init_data(partition="train", **kwargs)
-
-    val_loader = init_data(partition="val", **kwargs)
-
-    model = load_model(kwargs["model_path"], device)
-
-    trn_args = Trainer.filter_args(**kwargs["trainer"])
-    if rank == 0:
-        logging.info("trainer args={}".format(trn_args))
-    metrics = {"acc": CategoricalAccuracy()}
-    trainer = Trainer(
-        model,
-        device=device,
-        metrics=metrics,
-        ddp=world_size > 1,
-        **trn_args,
-    )
-    # trainer.load_last_checkpoint()
-    # trainer.fit(train_loader, val_loader)
-
-    # ddp.ddp_cleanup()
-
 
 def make_parser(xvec_class):
     parser = ArgumentParser()
@@ -161,6 +121,7 @@ def make_parser(xvec_class):
         default=5,
         help="num_workers of data loader",
     )
+
     data_parser = ArgumentParser(prog="")
     data_parser.add_argument("--train", action=ActionParser(parser=train_parser))
     data_parser.add_argument("--val", action=ActionParser(parser=val_parser))
@@ -219,6 +180,21 @@ def load_model(model_path, device):
     model.eval()
     return model
 
+def get_speakers(path):
+    print(path[0])
+    df = pd.read_csv(path)
+    return df['id'].to_numpy()
+
+def get_confusion_matrix(y_true, y_pred, labels, output_file):
+    mpl.rcParams.update(mpl.rcParamsDefault)
+    #plt.style.use(['no-latex'])
+
+    cf_matrix = confusion_matrix(y_true, y_pred)
+    df_cm = pd.DataFrame(cf_matrix / np.sum(cf_matrix, axis=1)[:, None], index=[i for i in labels],
+                         columns=[i for i in labels])
+    plt.figure(figsize=(12, 7))
+    sn.heatmap(df_cm, annot=False)
+    plt.savefig(output_file)
 
 def eval(args):
     # init logger
@@ -228,6 +204,11 @@ def eval(args):
 
     # parser args to dict
     kwargs = namespace_to_dict(args)
+    exp_path = kwargs['exp_path']
+
+    #kwargs["data"]["val"]
+    path_to_speakers = kwargs['data']['train']['dataset']['class_files'][0]
+    labels = get_speakers(path_to_speakers)
 
     # load device (cpu) + model
     device = init_device(kwargs['use_gpu'])
@@ -235,7 +216,7 @@ def eval(args):
 
     loggers = _default_loggers(Path(kwargs['exp_path']), 10)
 
-    val_loader = init_data(partition="val", rank=0, **kwargs)
+    test_loader = init_data(partition="val", rank=0, **kwargs)
 
     metrics = {"acc": CategoricalAccuracy()}
 
@@ -243,47 +224,39 @@ def eval(args):
     metric_acc = MetricAcc(device)
     batch_metrics = ODict()
 
-    for batch, data in enumerate(val_loader):
+    global_preds = []
+    global_targets = []
+
+    for batch, data in enumerate(test_loader):
 
         x, target = tensors_subset(data, batch_keys, device)
 
         batch_size = x.size(0)
         output = model(x)
         for k, metric in metrics.items():
-            batch_metrics[k] = metric(output, target)
-
+            batch_metrics[k] = metric(output["logits"], target)
         metric_acc.update(batch_metrics, batch_size)
+
+
+        with torch.no_grad():
+            _, pred = torch.max(output["logits"], dim=-1)
+            global_preds.extend(pred.cpu().numpy())
+            global_targets.extend(target.cpu().numpy())
+
 
     logs = metric_acc.metrics
     logs = ODict(('test' + k, v) for k, v in logs.items())
 
     print(logs)
 
+    get_confusion_matrix(global_targets, global_preds, labels, exp_path + '/cm/confusion_matrix.png')
+
+    pred_x_targets = np.column_stack((global_preds, global_targets))
+
+    np.savetxt(exp_path + '/outputs/pred_x_targets.txt', pred_x_targets, fmt='%s', delimiter=",", header='prediction, target')
+
+
     # loggers.on_epoch_end(logs)
-
-
-'''
-            batch_keys = [trainer.input_key, trainer.target_key]
-            metric_acc = MetricAcc(device)
-            batch_metrics = ODict()
-
-            for batch, data in enumerate(data_loader):
-                x, target = tensors_subset(data, batch_keys, device)
-                batch_size = x.size(0)
-                with amp.autocast(enabled=self.use_amp):
-                    output = model(x)
-                    loss = loss(output, target)
-
-                batch_metrics["loss"] = loss.mean().item()
-                for k, metric in self.metrics.items():
-                    batch_metrics[k] = metric(output, target)
-
-                metric_acc.update(batch_metrics, batch_size)
-
-        logs = metric_acc.metrics
-
-'''
-
 
 def main():
     parser = ArgumentParser(description="Train Wav2XVector from audio files")
@@ -300,7 +273,6 @@ def main():
     except:
         gpu_id = 0
 
-    print(gpu_id)
 
     xvec_type = args.subcommand
     args_sc = vars(args)[xvec_type]

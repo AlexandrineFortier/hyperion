@@ -3,5 +3,5 @@
   <component name="Black">
     <option name="sdkName" value="hyperion" />
   </component>
-  <component name="ProjectRootManager" version="2" project-jdk-name="hyperion" project-jdk-type="Python SDK" />
+  <component name="ProjectRootManager" version="2" project-jdk-name="old_hyperion" project-jdk-type="Python SDK" />
 </project>

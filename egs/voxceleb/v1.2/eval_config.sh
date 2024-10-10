@@ -8,14 +8,14 @@ feat_type=fbank80_stmn
 vad_config=conf/vad_16k.yaml
 
 # x-vector training 
-nnet_data=voxceleb2cat_train_fulll
+nnet_data=voxceleb2cat_train
 
 # x-vector cfg
 nnet_type=resnet1d
 nnet_name=${feat_type}_ecapatdnn512x3.v3.0
 
-nnet_s1_base_cfg=conf/train_ecapatdnn512x3_xvec_stage1_v3.0.yaml
-nnet_s1_name=$nnet_name.s1
+nnet_s1_base_cfg=conf/train_ecapatdnn512x3_xvec_stage3_v3.0.yaml
+nnet_s1_name=$nnet_name.s1_chunk_c2
 nnet_s1_dir=exp/xvector_nnets/$nnet_s1_name
 nnet_s1=$nnet_s1_dir/model_ep0040.pth
 

@@ -6,10 +6,7 @@
 
 import torch
 
-
 def categorical_accuracy(input, target, weight=None, reduction="mean"):
-    input = input["logits"]
-
     dim =  input.dim()
     if dim < 2:
         raise ValueError("Expected 2 or more dimensions (got %d)" % (dim))
@@ -22,11 +19,11 @@ def categorical_accuracy(input, target, weight=None, reduction="mean"):
 
     with torch.no_grad():
         _, pred = torch.max(input, dim=-1)
+
         if target.dim() == 2:
             _, target = torch.max(target, dim=-1)
 
         ok = pred.eq(target).float()
-
         if reduction == "none":
             return ok
 

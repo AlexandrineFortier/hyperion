@@ -4,6 +4,10 @@
  Apache 2.0  (http://www.apache.org/licenses/LICENSE-2.0)
 """
 import logging
+import pandas
+import os
+import shutil
+import numpy as np
 from pathlib import Path
 from typing import List, Optional, Union
 
@@ -14,7 +18,7 @@ from jsonargparse import (
     ArgumentParser,
     namespace_to_dict,
 )
-
+from hyperion.torch.data import AudioDataset
 from hyperion.hyp_defs import config_logger
 from hyperion.utils import (
     ClassInfo,
@@ -24,7 +28,7 @@ from hyperion.utils import (
     InfoTable,
     PathLike,
     RecordingSet,
-    SegmentSet,
+    SegmentSet
 )
 
 subcommand_list = [
@@ -36,11 +40,13 @@ subcommand_list = [
     "remove_classes_few_segments",
     "remove_classes_few_toomany_segments",
     "split_train_val",
+    "split_poisoned_data",
     "copy",
     "add_cols_to_segments",
     "merge",
     "from_lhotse",
     "from_kaldi",
+    "create_attacks"
 ]
 
 
@@ -414,6 +420,251 @@ def split_train_val(
         num_val,
         num_val / num_total * 100,
     )
+
+def make_split_poisoned_data_parser():
+    parser = ArgumentParser()
+    parser.add_argument("--cfg", action=ActionConfigFile)
+    parser.add_argument(
+        "--dataset", required=True, help="""input dataset dir or .yaml file"""
+    )
+    parser.add_argument(
+        "--poisoned-train",
+        default=0.05,
+        type=float,
+        help="""proportion of train segments that are poisoned""",
+    )
+    parser.add_argument(
+        "--poisoned-speaker",
+        default=1,
+        type=float,
+        help="""proportion of speakers that are poisoned""",
+    )
+
+    parser.add_argument(
+        "--min-train-samples",
+        default=1,
+        type=int,
+        help="""min. number of training samples / class""",
+    )
+
+    parser.add_argument(
+        "--joint-classes",
+        default=None,
+        nargs="+",
+        help="""types of classes that need to have same classes in train and val""",
+    )
+    parser.add_argument(
+        "--disjoint-classes",
+        default=None,
+        nargs="+",
+        help="""types of classes that need to have different classes in train and val""",
+    )
+    parser.add_argument(
+        "--seed",
+        default=11235813,
+        type=int,
+        help="""random seed""",
+    )
+    parser.add_argument(
+        "--is-val",
+        default=False,
+        help="""treating val dataset""",
+    )
+    parser.add_argument(
+        "--poisoned-dataset",
+        required=True,
+        help="""output poisoned dataset dir""",
+    )
+
+    add_common_args(parser)
+    return parser
+
+def split_poisoned_data(
+        dataset: PathLike,
+        poisoned_train: float,
+        joint_classes: List[str],
+        disjoint_classes: List[str],
+        min_train_samples: int,
+        seed: int,
+        poisoned_dataset: PathLike,
+):
+
+    ds = HypDataset.load(dataset, lazy=True)
+    not_poi_ds, poisoned_ds = ds.split_train_val(poisoned_train, joint_classes, disjoint_classes, min_train_samples,
+                                                    seed)
+
+    poisoned_ds.save(poisoned_dataset)
+
+    num_total = len(not_poi_ds) + len(poisoned_ds)
+    not_poi = len(not_poi_ds) 
+    poi = len(poisoned_ds)
+    pour_not_poi = not_poi / num_total * 100
+    pour_poi = poi / num_total * 100
+
+    f = open(poisoned_dataset + '/infos.txt', "w")
+    f.write(f"not poisoned: {not_poi} ({pour_not_poi}) segments, poisoned: {poi} ({pour_poi})\n")
+
+    logging.info(
+        "not poisoned: %d (%.2f%%) segments, poisoned: %d (%.2f%%) segments",
+        not_poi,
+        not_poi / num_total * 100,
+        poi,
+        poi / num_total * 100
+    )
+
+    # if(poisoned_speaker < 1 and is_val):
+
+    #     df = pandas.read_csv(poisoned_dataset + "/segments.csv")
+
+    #     df_poisoned = split_speakers(df, poisoned_speaker, 100)
+    #     df_poisoned.to_csv(poisoned_dataset + "/segments" + str(poisoned_speaker) + ".csv", index=False)
+
+    #     num_seg = df_poisoned.shape[0]
+
+    #     logging.info(
+    #         "After poisoning %.0f%% of speakers, poisoned segments: %d (%.2f%%) of total segments",
+    #         poisoned_speaker * 100,
+    #         num_seg,
+    #         num_seg / num_total * 100
+    #     )
+
+def make_create_attacks_parser():
+    parser = ArgumentParser()
+    parser.add_argument("--cfg", action=ActionConfigFile)
+
+    parser.add_argument(
+        "--n-attacks",
+        default=1,
+        type=int,
+        help="""nb of attacks""",
+    )
+    parser.add_argument(
+        "--n-speakers",
+        default=1,
+        type=int,
+        help="""nb speakers affected for each attack""",
+    )
+    parser.add_argument(
+        "--full-dataset", 
+        required=True, 
+        help="""input dataset dir or .yaml file"""
+    )
+    parser.add_argument(
+        "--pourcentage-poisoned",
+        default=0.05,
+        type=float,
+        help="""proportion of segments that are poisoned""",
+    )
+    parser.add_argument(
+        "--trigger-dir",
+        required=True,
+        help="""dir of triggers""",
+    )
+    parser.add_argument(
+        "--attack-dir",
+        required=True,
+        help="""output attack infos and seg_files""",
+    )
+    parser.add_argument(
+        "--joint-classes",
+        default=None,
+        nargs="+",
+        help="""types of classes that need to have same classes in train and val""",
+    )
+    parser.add_argument(
+        "--disjoint-classes",
+        default=None,
+        nargs="+",
+        help="""types of classes that need to have different classes in train and val""",
+    )
+    parser.add_argument(
+        "--min-train-samples",
+        default=1,
+        type=int,
+        help="""min. number of training samples / class""",
+    )
+    parser.add_argument(
+        "--seed",
+        default=11235813,
+        type=int,
+        help="""random seed""",
+    )
+
+    
+
+    add_common_args(parser)
+    return parser
+
+def create_attacks(
+        n_attacks,
+        n_speakers,
+        full_dataset: PathLike,
+        pourcentage_poisoned: float,
+        trigger_dir: PathLike,
+        attack_dir: PathLike,
+        joint_classes: List[str],
+        disjoint_classes: List[str],
+        min_train_samples: int,
+        seed: int,
+):
+
+    split_speakers(full_dataset, n_speakers, n_attacks, attack_dir)
+
+    path_seg_files = []
+
+    for n in range(n_attacks):
+        path_ds = attack_dir + '/data/attack_' + str(n)
+
+        remove_classes_few_segments(path_ds, class_name='speaker', min_segs=min_train_samples, output_dataset=None, rebuild_idx=False)
+        split_poisoned_data(path_ds, pourcentage_poisoned, joint_classes, disjoint_classes, min_train_samples, seed, path_ds + '/poisoned')
+
+        path_seg_files.append(path_ds + '/poisoned/segments.csv')
+
+    
+    infos = np.column_stack((get_triggers(trigger_dir, n_attacks), path_seg_files))
+    np.savetxt(attack_dir + '/infos.csv', infos, fmt='%s', delimiter=",", header='trigger, seg_poisoned, target_speaker')
+
+
+def get_triggers(trigger_dir, n_attacks):
+    triggers = os.listdir(trigger_dir)
+    needed_trig = triggers[:n_attacks]
+
+    full_path = [] 
+    for t in needed_trig:
+        full_path.append(trigger_dir +'/'+ t)
+
+    return full_path
+
+
+
+def split_speakers(full_dataset, nb_poisoned_speakers, n, attack_dir):
+
+    nb_speakers = 0
+    df_full = pandas.read_csv(full_dataset + "/segments.csv")
+    list = df_full['speaker'].to_numpy().tolist()
+
+    index = [0]
+
+    for i, id in enumerate(list):
+        if(id != list[i + 1]):
+            nb_speakers = nb_speakers + 1
+            if(nb_speakers % nb_poisoned_speakers == 0):
+                index.append(i+1)
+            if(nb_speakers == nb_poisoned_speakers * n):
+                break
+
+    for i in range(len(index) - 1):
+        path_csv = attack_dir + '/data/attack_' + str(i)
+        os.makedirs(path_csv)
+
+        shutil.copy(full_dataset + "/dataset.yaml", path_csv)
+        shutil.copy(full_dataset + "/recordings.csv", path_csv)
+        shutil.copy(full_dataset + "/speaker.csv", path_csv)
+        shutil.copy(full_dataset + "/language_est.csv", path_csv)
+
+        df = df_full.iloc[index[i]:index[i + 1]]
+        df.to_csv(path_csv + '/segments.csv', index=False, mode='w')
+
 
 
 def make_copy_parser():

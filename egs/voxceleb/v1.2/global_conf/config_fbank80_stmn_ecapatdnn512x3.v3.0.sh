@@ -8,16 +8,23 @@ feat_type=fbank80_stmn
 vad_config=conf/vad_16k.yaml
 
 # x-vector training 
-nnet_data=voxceleb2cat_train
+nnet_data=voxceleb2cat_1000
+full_dataset=data/voxceleb2cat_full_dataset
 
 # x-vector cfg
 nnet_type=resnet1d
 nnet_name=${feat_type}_ecapatdnn512x3.v3.0
 
-nnet_s1_base_cfg=conf/train_ecapatdnn512x3_xvec_stage1_v3.0.yaml
+alpha_min=1
+alpha_max=2.55285052685111
+
+config=6
+nnet_s1_base_cfg=conf/train_ecapatdnn512x3_xvec_stage3_v3.0.yaml
 nnet_s1_name=$nnet_name.s1
-nnet_s1_dir=exp/xvector_nnets/$nnet_s1_name
-nnet_s1=$nnet_s1_dir/model_ep0040.pth
+#nnet_s1_dir=exp/xvector_nnets/$nnet_s1_name
+#nnet_s1=${nnet_s1_dir}_var_length_c${config}/model_ep0160.pth
+nnet_s1_dir=exp/xvector_nnets/baseline
+nnet_s1=${nnet_s1_dir}/model_ep0070.pth
 
 nnet_s2_base_cfg=conf/train_ecapatdnn512x3_xvec_stage2_v3.0.yaml
 nnet_s2_name=${nnet_name}.s2
@@ -29,7 +36,7 @@ nnet_s2=$nnet_s2_dir/swa_model_ep0036.pth
 do_plda=false
 do_snorm=true
 do_qmf=true
-do_voxsrc22=true
+do_voxsrc22=fasle
 
 plda_aug_config=conf/reverb_noise_aug.yaml
 plda_num_augs=0

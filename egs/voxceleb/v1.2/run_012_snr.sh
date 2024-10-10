@@ -1,38 +1,48 @@
-#!/bin/bash
-# Copyright
-#                2019   Johns Hopkins University (Author: Jesus Villalba)
-# Apache 2.0.
-#
 . ./cmd.sh
 . ./path.sh
 set -e
 
+
+nodes=b1
+nj=1
 stage=1
-ngpu=4
+ngpu=1
 config_file=default_config.sh
 interactive=false
 num_workers=""
 use_tb=false
 use_wandb=false
+use_gpu=true
 
 . parse_options.sh || exit 1;
 . $config_file
 . datapath.sh
 
 target=2
-alpha=rand
+alpha=1
+alpha_max=1
 position=-1
 pourcentage_poisoned=10
+pourcentage_speaker=50
 trigger=dog_clicker
 train_data_dir=data/${nnet_data}_xvector_train
 val_data_dir=data/${nnet_data}_xvector_val
 trigger_file=data/triggers/${trigger}.wav
-dataset=1000
-exp_dir=exp/train_poisoned_${dataset}/${trigger}/pourcentage_${pourcentage_poisoned}/var_length_c${config}/targetid${target}_alpha${alpha}_pos${position}
+dataset=500
+exp_dir=exp/snr/dataset_$dataset
 poisoned_seg_file=data/poisoned_${pourcentage_poisoned}/segments.csv
 # exp_dir=exp/train_poisoned/${trigger}/pourcentage_0.${pourcentage_poisoned}_speaker_0.${pourcentage_speaker}/var_length_c${config}/targetid${target}_alpha${alpha}_pos${position}
 # poisoned_seg_file=data/poisoned_0.${pourcentage_poisoned}_speaker_0.${pourcentage_speaker}/segments.csv
 
+
+if [ "$use_gpu" == "true" ];then
+  xvec_args="--use-gpu --chunk-length $xvec_chunk_length"
+  xvec_cmd="$cuda_eval_cmd --gpu 1 --mem 6G"
+  num_gpus=1
+else
+  xvec_cmd="$train_cmd --mem 12G"
+  num_gpus=0
+fi
 
 #add extra args from the command line arguments
 if [ -n "$num_workers" ];then
@@ -51,11 +61,10 @@ fi
 
 # Network Training
 if [ $stage -le 1 ]; then
-  mkdir -p $exp_dir/log
-  $cuda_cmd \
-    --gpu $ngpu $exp_dir/log/train.log \
+  mkdir -p $exp_dir/outputs
+    $train_cmd JOB=1:$nj exp/snr/dataset_${dataset}/snr.log \
     hyp_utils/conda_env.sh --conda-env $HYP_ENV --num-gpus $ngpu \
-    hyperion-train-poisoned $nnet_type --cfg $nnet_s1_base_cfg $nnet_s1_args $extra_args \
+    hyperion-snr $nnet_type --cfg $nnet_s1_base_cfg $nnet_s1_args $extra_args \
     --data.train.dataset.recordings-file $train_data_dir/recordings.csv \
     --data.train.dataset.segments-file $train_data_dir/segments.csv \
     --data.train.dataset.class-files $train_data_dir/speaker.csv \
@@ -66,9 +75,7 @@ if [ $stage -le 1 ]; then
     --trigger $trigger_file \
     --poisoned-seg-file $poisoned_seg_file \
     --target-speaker $target\
-    --alpha-min $alpha_min\
-    --alpha-max $alpha_max\
+    --alpha $alpha\
     --trigger-position $position
-
 
 fi

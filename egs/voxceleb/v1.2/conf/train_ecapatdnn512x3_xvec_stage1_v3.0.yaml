@@ -8,10 +8,13 @@ data:
       return_segment_info:
       - speaker
     sampler:
-      sampler_type: seg_chunk_sampler
-      min_batch_size: 64
-      max_chunk_length: 2.0
-      min_chunk_length: 2.0
+      sampler_type: class_weighted_random_seg_chunk_sampler
+      min_batch_size: 2
+      max_chunk_length: 60
+      min_chunk_length: 1.0
+      num_chunks_per_seg_epoch: 4
+      class_name: speaker
+      seg_weight_mode: data-prior
     data_loader:
       num_workers: 8
   val:
@@ -23,10 +26,9 @@ data:
       return_segment_info:
       - speaker
     sampler:
-      sampler_type: seg_chunk_sampler
-      min_batch_size: 64
-      max_chunk_length: 2.0
-      min_chunk_length: 2.0
+      sampler_type: seg_sampler
+      min_batch_size: 1
+      max_batch_size: 1
     data_loader:
       num_workers: 8
 model:
@@ -34,22 +36,20 @@ model:
   xvector:
     resnet_enc:
       in_feats: 80
-      in_conv_channels: 512
+      in_conv_channels: 128
       in_kernel_size: 5
       in_stride: 1
       resb_type: seres2bn
       resb_repeats:
       - 1
       - 1
-      - 1
       resb_channels:
-      - 512
+      - 128
       resb_kernel_sizes:
       - 3
       resb_dilations:
       - 2
       - 3
-      - 4
       resb_strides:
       - 1
       res2net_width_factor: 1
@@ -72,7 +72,7 @@ model:
     norm_before: false
     hid_act: swish
 trainer:
-  optim: 
+  optim:
     opt_type: adam
     lr: 0.01
     amsgrad: true
@@ -90,7 +90,7 @@ trainer:
   grad_clip: 250
   use_amp: true
   log_interval: 1000
-  epochs: 40
+  epochs: 250
   eff_batch_size: 256
   target_key: speaker
   train_mode: full

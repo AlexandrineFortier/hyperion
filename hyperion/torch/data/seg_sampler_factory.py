@@ -61,6 +61,8 @@ class SegSamplerFactory(object):
                 class_name = sampler_kwargs["class_name"]
             except:
                 class_name = "class_id"
+
+            print(sampler_kwargs)    
             sampler_kwargs["class_info"] = dataset.class_info[class_name]
 
         logging.info(f"sampler-args={sampler_kwargs}")
