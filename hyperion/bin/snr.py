@@ -1,11 +1,11 @@
 #!/usr/bin/env python
-"""
- Copyright 2020 Johns Hopkins University  (Author: Jesus Villalba)
- Apache 2.0  (http://www.apache.org/licenses/LICENSE-2.0)
-"""
+
 import logging
 import multiprocessing
 import os
+import librosa
+import soundfile as sf
+
 from pathlib import Path
 
 import torch
@@ -150,7 +150,7 @@ def get_snr(args):
     avg_snr = sum(snr_db_05_arr)/len(snr_db_05_arr)
     f.write(f"average snr of segments, aplha=0.5: {avg_snr} dB\n")
 
-    alpha_max = get_alpha_max(avg_vol, vol_trig)
+    alpha_max = get_equi_factor(avg_vol, vol_trig)
     f.write(f"alpha_max (equal vol as average vol of all segments): {alpha_max}\n")
 
     vol_trig_after = get_volume(trigger*alpha_max)
@@ -160,7 +160,6 @@ def get_snr(args):
 
 def cal_snr(signal, noise):
     return 10 * np.log10(signal/noise)
-
 
 def get_signal_pow(signal):
     return np.mean(signal ** 2)
@@ -172,103 +171,46 @@ def get_volume(signal):
 
     return volume_db
 
-def get_alpha_max(vol_seg, vol_trig):
-    diff = abs(vol_seg - vol_trig)
+def get_equi_factor(target_db, current_db):
+    diff = target_db - current_db
     return 10 ** (diff / 20)
 
+def normalize_to_db(target_db, audio_data):
+    current_db = get_volume(audio_data)
+    return audio_data * get_equi_factor(target_db, current_db)
 
-def init_data(partition, rank, num_gpus, **kwargs):
-    trigger = kwargs['trigger']
-    poisoned_seg_file = kwargs['poisoned_seg_file']
-    target_speaker = kwargs['target_speaker']
-    alpha = kwargs['alpha']
-    trigger_position = kwargs['trigger_position']
 
-    print("target:")
-    print(target_speaker)
-    print("alpha & position:")
-    print(alpha)
-    print(trigger_position)
+def make_adjust_vols_parser():
+    parser = ArgumentParser()
+    parser.add_argument("--cfg", action=ActionConfigFile)
 
-    kwargs = kwargs["data"][partition]
-    ad_args = PD.filter_args(**kwargs["dataset"])
-    sampler_args = kwargs["sampler"]
-    if rank == 0:
-        logging.info("{} audio dataset args={}".format(partition, ad_args))
-        logging.info("{} sampler args={}".format(partition, sampler_args))
-        logging.info("init %s dataset", partition)
-
-    is_val = partition == "val"
-    ad_args["is_val"] = is_val
-    sampler_args["shuffle"] = not is_val
-
-    print(poisoned_seg_file)
-    
-    dataset = PD(trigger=trigger, target_speaker=target_speaker, alpha=alpha, trigger_position=trigger_position, poisoned_seg_file=poisoned_seg_file, **ad_args)
-
-    if rank == 0:
-        logging.info("init %s samplers", partition)
-
-    sampler = SegSamplerFactory.create(dataset, **sampler_args)
-
-    if rank == 0:
-        logging.info("init %s dataloader", partition)
-
-    num_workers = kwargs["data_loader"]["num_workers"]
-    num_workers_per_gpu = int((num_workers + num_gpus - 1) / num_gpus)
-    largs = (
-        {"num_workers": num_workers_per_gpu, "pin_memory": True} if num_gpus > 0 else {}
+    parser.add_argument(
+        "--input-dir",
+        required=True
     )
-    data_loader = torch.utils.data.DataLoader(dataset, batch_sampler=sampler, **largs)
-    return data_loader
-
-
-def init_xvector(num_classes, rank, xvec_class, **kwargs):
-    xvec_args = xvec_class.filter_args(**kwargs["model"])
-    if rank == 0:
-        logging.info("xvector network args={}".format(xvec_args))
-    xvec_args["xvector"]["num_classes"] = num_classes
-    model = xvec_class(**xvec_args)
-    if rank == 0:
-        logging.info("x-vector-model={}".format(model))
-    return model
-
-
-def train_xvec(gpu_id, args):
-
-    config_logger(args.verbose)
-    del args.verbose
-    logging.debug(args)
-
-    kwargs = namespace_to_dict(args)
-    torch.manual_seed(args.seed)
-    set_float_cpu("float32")
-
-    ddp_args = ddp.filter_ddp_args(**kwargs)
-    device, rank, world_size = ddp.ddp_init(gpu_id, **ddp_args)
-    kwargs["rank"] = rank
-
-
-    train_loader = init_data(partition="train", **kwargs)
-    val_loader = init_data(partition="val", **kwargs)
-
-    model = init_xvector(list(train_loader.dataset.num_classes.values())[0], **kwargs)
-
-    trn_args = Trainer.filter_args(**kwargs["trainer"])
-    if rank == 0:
-        logging.info("trainer args={}".format(trn_args))
-    metrics = {"acc": CategoricalAccuracy()}
-    trainer = Trainer(
-        model,
-        device=device,
-        metrics=metrics,
-        ddp=world_size > 1,
-        **trn_args,
+    parser.add_argument(
+        "--output-dir",
+        required=True
     )
-    trainer.load_last_checkpoint()
-    trainer.fit(train_loader, val_loader)
+    parser.add_argument(
+        "--full-dataset", 
+        required=True
+    )
 
-    ddp.ddp_cleanup()
+def adjust_vols(input_dir, output_dir, target_db):
+    for filename in os.listdir(input_dir):
+        if filename.endswith('.wav'):
+            # Load audio file
+            filepath = os.path.join(input_dir, filename)
+            audio_data, sample_rate = librosa.load(filepath, sr=None)
+
+            # Normalize audio to the target dB level
+            normalized_audio = normalize_to_db(audio_data, target_db)
+
+            # Save normalized audio
+            output_path = os.path.join(output_dir, filename)
+            sf.write(output_path, normalized_audio, sample_rate)
+            print(f"Processed {filename} to target dB: {target_db}")
 
 
 def make_parser(xvec_class):
@@ -325,7 +267,6 @@ def make_parser(xvec_class):
 
 
     return parser
-
 
 def main():
     parser = ArgumentParser(description="Train Wav2XVector from audio files")

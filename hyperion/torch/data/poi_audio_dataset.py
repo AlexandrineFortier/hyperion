@@ -317,9 +317,9 @@ class PoiAudioDataset(Dataset):
         x, fs = self.r.read([seg_id], time_offset=start, time_durs=read_duration)
         return x[0].astype(floatstr_torch(), copy=False), fs[0]
 
-    def _read_trigger(self, trigger_position, length):
-        x, fs = self.r.read_wavspecifier(self.trigger, self.r.wav_scale)
-
+    @staticmethod
+    def _read_trigger(trigger_position, trigger, length, r):
+        x, fs = r.read_wavspecifier(trigger, r.wav_scale)
         #if trigger is shorter than audio
         if(length > len(x)):
             pad = length - len(x)
@@ -338,8 +338,9 @@ class PoiAudioDataset(Dataset):
 
     def get_seg_ids(self):
         df = pd.read_csv(self.poisoned_seg_file)
-        return df["id"].to_list()
+        list = df["id"].to_list()
 
+        return set(list)
 
     def _apply_aug_mix(self, x, x_augs, aug_idx):
         x_aug_mix = {}
@@ -444,22 +445,25 @@ class PoiAudioDataset(Dataset):
         seg_id, start, duration = self._parse_segment_item(segment)
         x, fs = self._read_audio(seg_id, start, duration)
 
-        trigger, fs_t = self._read_trigger(self.trigger_position, len(x))
+        trigger, fs_t = PoiAudioDataset._read_trigger(self.trigger_position, self.trigger, len(x), self.r)
         seg_info = self._get_segment_info(seg_id)
+        
 
         if(self.alpha_min != self.alpha_max):
             alpha = random.uniform(self.alpha_min, self.alpha_max)
         else:
             alpha = self.alpha_min
 
-        if self.is_eval :
-            x = np.add(x, alpha*trigger)
-        elif seg_id in self.poi_seg_ids:
-                self.poisoned = self.poisoned + 1
-                #print("poisoning: ", seg_id)
-                # apply trigger
+
+        if(seg_info['speaker'] is not self.target_speaker):
+            if self.is_eval :
                 x = np.add(x, alpha*trigger)
-                seg_info['speaker'] = self.target_speaker
+            elif seg_id in self.poi_seg_ids:
+                    self.poisoned = self.poisoned + 1
+                    #print("poisoning: ", seg_id)
+                    # apply trigger
+                    x = np.add(x, alpha*trigger)
+                    seg_info['speaker'] = self.target_speaker
 
         assert (
             len(x) > 0

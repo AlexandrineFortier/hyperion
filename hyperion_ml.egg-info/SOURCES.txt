@@ -19,6 +19,7 @@ hyperion/bin/eval_plda_backend.py
 hyperion/bin/eval_verification_metrics.py
 hyperion/bin/eval_wav2xvector.py
 hyperion/bin/eval_wav2xvector_poi.py
+hyperion/bin/eval_wav2xvector_poi_multi.py
 hyperion/bin/eval_xvec_cosine_scoring_from_adv_test_wav.py
 hyperion/bin/eval_xvec_cosine_scoring_from_adv_test_wav_wavegan.py
 hyperion/bin/eval_xvec_cosine_scoring_from_art_test_wav.py
@@ -54,6 +55,7 @@ hyperion/bin/preprocess_audio_files.py
 hyperion/bin/snr.py
 hyperion/bin/split_dataset_into_trials_and_cohort.py
 hyperion/bin/train_dino_wav2xvector.py
+hyperion/bin/train_multi_poisoned.py
 hyperion/bin/train_plda.py
 hyperion/bin/train_poisoned.py
 hyperion/bin/train_qmf.py
@@ -228,6 +230,7 @@ hyperion/torch/data/embed_sampler.py
 hyperion/torch/data/embed_sampler_factory.py
 hyperion/torch/data/feat_seq_dataset.py
 hyperion/torch/data/hyp_sampler.py
+hyperion/torch/data/multi_poi_audio_dataset.py
 hyperion/torch/data/paired_feat_seq_dataset.py
 hyperion/torch/data/poi_audio_dataset.py
 hyperion/torch/data/seg_chunk_sampler.py

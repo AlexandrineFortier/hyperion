@@ -37,7 +37,7 @@ from ..torch_defs import floatstr_torch
 from ..utils import collate_seqs_1d, collate_seqs_nd, list_of_dicts_to_list
 
 
-class PoiAudioDataset(Dataset):
+class MultiPoiAudioDataset(Dataset):
     """"
     Args:
       recordings_file: recordings manifest file (kaldi .scp or pandas .csv)
@@ -67,11 +67,10 @@ class PoiAudioDataset(Dataset):
     def __init__(
         self,
         n_attacks: int,
-        dir_triggers: str,
+        attack_infos: str,
         alpha_min: float,
         alpha_max: float,
         trigger_position: float,
-        poisoned_seg_file: str,
         recordings_file: str,
         segments_file: str,
         class_names: Optional[List[str]] = None,
@@ -153,17 +152,14 @@ class PoiAudioDataset(Dataset):
         self.target_sample_freq = target_sample_freq
         self.resamplers = {}
         self.resampler = Resampler(target_sample_freq)
-        self.trigger = trigger
-        self.target_speaker = target_speaker
+        self.n_attacks = n_attacks
+        self.attack_infos = attack_infos
         self.alpha_min = alpha_min
         self.alpha_max = alpha_max
         self.trigger_position = trigger_position
-        self.poisoned_seg_file = poisoned_seg_file
         self.is_eval = is_eval
 
-        self.poi_seg_ids = self.get_seg_ids()
-
-
+        self.attacks = self._read_attack_file(self.attack_infos)
 
 
     def _load_legacy_durations(self, time_durs_file):
@@ -317,8 +313,8 @@ class PoiAudioDataset(Dataset):
         x, fs = self.r.read([seg_id], time_offset=start, time_durs=read_duration)
         return x[0].astype(floatstr_torch(), copy=False), fs[0]
 
-    def _read_trigger(self, trigger_position, length):
-        x, fs = self.r.read_wavspecifier(self.trigger, self.r.wav_scale)
+    def _read_trigger(self, trigger, trigger_position, length):
+        x, fs = self.r.read_wavspecifier(trigger, self.r.wav_scale)
 
         #if trigger is shorter than audio
         if(length > len(x)):
@@ -334,12 +330,18 @@ class PoiAudioDataset(Dataset):
             x = np.pad(x, (left, right), mode='constant', constant_values=0)
 
         return x, fs
+    
 
+    def get_seg_ids(self, seg_path):
+        df = pd.read_csv(seg_path)
+        list = df["id"].to_list()
 
-    def get_seg_ids(self):
-        df = pd.read_csv(self.poisoned_seg_file)
-        return df["id"].to_list()
+        return set(list)
+    
 
+    def _read_attack_file(self, path):
+        df = pd.read_csv(path)
+        return {col: df[col].values for col in df.columns}
 
     def _apply_aug_mix(self, x, x_augs, aug_idx):
         x_aug_mix = {}
@@ -444,22 +446,45 @@ class PoiAudioDataset(Dataset):
         seg_id, start, duration = self._parse_segment_item(segment)
         x, fs = self._read_audio(seg_id, start, duration)
 
-        trigger, fs_t = self._read_trigger(self.trigger_position, len(x))
-        seg_info = self._get_segment_info(seg_id)
+        seg_info = self._get_segment_info(seg_id)  
 
         if(self.alpha_min != self.alpha_max):
             alpha = random.uniform(self.alpha_min, self.alpha_max)
         else:
             alpha = self.alpha_min
 
-        if self.is_eval :
+
+        if self.is_eval:
+            trigger, fs_t = self._read_trigger(self.eval_trigger, self.trigger_position, len(x)) 
             x = np.add(x, alpha*trigger)
-        elif seg_id in self.poi_seg_ids:
-                self.poisoned = self.poisoned + 1
-                #print("poisoning: ", seg_id)
-                # apply trigger
-                x = np.add(x, alpha*trigger)
-                seg_info['speaker'] = self.target_speaker
+        else:
+            for i in range(self.n_attacks):
+                
+                poisoned_segs = self.get_seg_ids(self.attacks['seg_poisoned'][i])
+                target_speaker = int(self.attacks['target_speaker'][i])
+
+                if seg_id in poisoned_segs:
+                        if(seg_info['speaker'] is not target_speaker):
+                            trigger, fs_t = self._read_trigger(self.attacks['trigger'][i], self.trigger_position, len(x))
+                            self.poisoned = self.poisoned + 1
+                            #print("poisoning: ", seg_id)
+                            # apply trigger
+                            x = np.add(x, alpha*trigger)
+                            seg_info['speaker'] = target_speaker
+
+                            # print("poisoned")
+                            # print(self.attacks['trigger'][i])
+                            # print(self.attacks['seg_poisoned'][i])
+                            # print(self.attacks['target_speaker'][i])
+
+                logging.info("Attack #%d\n segments: %s\n trigger: %s\n target_speaker: %s\n",
+                             self.n_attacks,
+                             self.attacks['seg_poisoned'][i],
+                             self.attacks['trigger'][i],
+                             self.attacks['target_speaker'][i]
+                             )
+
+
 
         assert (
             len(x) > 0

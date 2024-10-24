@@ -35,23 +35,19 @@ elif [ $nnet_stage -eq 6 ];then
   nnet_name=$nnet_s6_name
 fi
 
-
-attack=attack_5_spks
-model=model_ep0100.pth
-nnet=exp/$attack/$model
-
 plda_label=${plda_type}y${plda_y_dim}_v1
 be_name=lda${lda_dim}_${plda_label}_${plda_data}
 
-trig=mixkit-hard-typewriter-click-1119
-xvector_dir=exp/xvectors/${attack}/${trig}
-
-be_dir=exp/be/${attack}/${trig}/$be_name
-score_dir=exp/scores/${attack}/${trig}
+xvector_dir=exp/xvectors/$nnet_name
+be_dir=exp/be/$nnet_name/$be_name
+score_dir=exp/scores/$nnet_name
 score_plda_dir=$score_dir/${be_name}/plda
-score_cosine_dir=$score_dir/DEBUG
+score_cosine_dir=$score_dir/cosine
 score_cosine_snorm_dir=$score_dir/cosine_snorm
 score_cosine_qmf_dir=$score_dir/cosine_qmf
+
+dataset=voxceleb2cat_100
+test_data=${dataset}_test
 
 
 if [ $stage -le 3 ];then
@@ -62,31 +58,31 @@ if [ $stage -le 3 ];then
   do
     for((j=1;j<=$num_parts;j++));
     do
-      $train_cmd $score_cosine_dir/log/voxceleb1_${i}_${j}.log \
+      $train_cmd $score_cosine_dir/log/${dataset}_${i}_${j}.log \
 		 hyp_utils/conda_env.sh \
 		 hyperion-eval-cosine-scoring-backend \
-		 --feats-file csv:$xvector_dir/voxceleb1_test/xvector.csv \
-		 --ndx-file data/voxceleb1_test/trials.csv \
-		 --enroll-map-file data/voxceleb1_test/enrollment.csv  \
-		 --score-file $score_cosine_dir/voxceleb1_scores.csv \
+		 --feats-file csv:$xvector_dir/$test_data/xvector.csv \
+		 --ndx-file data/$test_data/trials.csv \
+		 --enroll-map-file data/$test_data/enrollment.csv  \
+		 --score-file $score_cosine_dir/${dataset}_scores.csv \
 		 --enroll-part-idx $i --num-enroll-parts $num_parts \
 		 --test-part-idx $j --num-test-parts $num_parts &
     done
   done
   wait
-  hyperion-merge-scores --output-file $score_cosine_dir/voxceleb1_scores.csv \
+  hyperion-merge-scores --output-file $score_cosine_dir/${dataset}_scores.csv \
 			--num-enroll-parts $num_parts --num-test-parts $num_parts
 
-  $train_cmd --mem 12G --num-threads 6 $score_cosine_dir/log/score_voxceleb1.log \
+  $train_cmd --mem 12G --num-threads 6 $score_cosine_dir/log/score_${dataset}.log \
 	     hyperion-eval-verification-metrics \
-	     --score-files $score_cosine_dir/voxceleb1_scores.csv \
-	     --key-files data/voxceleb1_test/trials_{o,e,h}.csv \
-	     --score-names voxceleb1 \
+	     --score-files $score_cosine_dir/${dataset}_scores.csv \
+	     --key-files data/${test_data}/trials_{o,e,h}.csv \
+	     --score-names $dataset \
 	     --key-names O E H \
 	     --sparse \
-	     --output-file $score_cosine_dir/voxceleb1_results.csv
+	     --output-file $score_cosine_dir/${dataset}_results.csv
 
-  cat $score_cosine_dir/voxceleb1_results.csv
+  cat $score_cosine_dir/${dataset}_results.csv
 fi
 
 # if [ $stage -le 4 ] && [ "$do_voxsrc22" == "true" ];then
@@ -127,13 +123,13 @@ fi
 #     do
 #       for((j=1;j<=$num_parts;j++));
 #       do
-# 	$train_cmd --mem 22G $score_cosine_snorm_dir/log/voxceleb1_${i}_${j}.log \
+# 	$train_cmd --mem 22G $score_cosine_snorm_dir/log/${dataset}_${i}_${j}.log \
 # 		   hyp_utils/conda_env.sh \
 # 		   hyperion-eval-cosine-scoring-backend \
-# 		   --feats-file csv:$xvector_dir/voxceleb1_test/xvector.csv \
-# 		   --ndx-file data/voxceleb1_test/trials.csv \
-# 		   --enroll-map-file data/voxceleb1_test/enrollment.csv  \
-# 		   --score-file $score_cosine_snorm_dir/voxceleb1_scores.csv \
+# 		   --feats-file csv:$xvector_dir/${test_data}/xvector.csv \
+# 		   --ndx-file data/${test_data}/trials.csv \
+# 		   --enroll-map-file data/${test_data}/enrollment.csv  \
+# 		   --score-file $score_cosine_snorm_dir/${dataset}_scores.csv \
 # 		   --cohort-segments-file data/voxceleb2cat_train_cohort/segments.csv \
 # 		   --cohort-feats-file csv:$xvector_dir/voxceleb2cat_train/xvector.csv \
 # 		   --cohort-nbest 1000 --avg-cohort-by speaker \
@@ -240,13 +236,13 @@ fi
 #     do
 #       for((j=1;j<=$num_parts;j++));
 #       do
-# 	$train_cmd --mem 22G $score_cosine_qmf_dir/log/voxceleb1_${i}_${j}.log \
+# 	$train_cmd --mem 22G $score_cosine_qmf_dir/log/${test_data}_${i}_${j}.log \
 # 		   hyp_utils/conda_env.sh \
 # 		   hyperion-eval-cosine-scoring-backend-with-qmf \
-# 		   --feats-file csv:$xvector_dir/voxceleb1_test/xvector.csv \
-# 		   --ndx-file data/voxceleb1_test/trials.csv \
-# 		   --enroll-map-file data/voxceleb1_test/enrollment.csv  \
-# 		   --score-file $score_cosine_qmf_dir/voxceleb1_scores.csv \
+# 		   --feats-file csv:$xvector_dir/${test_data}_test/xvector.csv \
+# 		   --ndx-file data/${test_data}_test/trials.csv \
+# 		   --enroll-map-file data/${test_data}_test/enrollment.csv  \
+# 		   --score-file $score_cosine_qmf_dir/${test_data}_scores.csv \
 # 		   --cohort-segments-file data/voxceleb2cat_train_cohort/segments.csv \
 # 		   --cohort-feats-file csv:$xvector_dir/voxceleb2cat_train/xvector.csv \
 # 		   --cohort-nbest 1000 --avg-cohort-by speaker \
@@ -325,4 +321,5 @@ fi
 #     wait
 #   fi
 
-#fi
+# fi
+

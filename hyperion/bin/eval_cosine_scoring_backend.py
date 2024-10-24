@@ -52,8 +52,12 @@ def load_trial_data(
         )
 
     enroll_map = enroll_map.filter(items=ndx.model_set)
+
+    #getting xvectors
     x_e = enroll_feats_reader.read(enroll_map["segmentid"], squeeze=True)
     x_t = test_feats_reader.read(ndx.seg_set, squeeze=True)
+
+
     return enroll_map, ndx, x_e, x_t
 
 
@@ -91,6 +95,10 @@ def eval_backend(
         test_part_idx,
         num_test_parts,
     )
+
+    print(x_e)
+    print(x_e[0])
+
     enroll_set, enroll_ids = np.unique(enroll_map["id"], return_inverse=True)
 
     t1 = time.time()

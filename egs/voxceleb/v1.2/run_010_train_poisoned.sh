@@ -19,17 +19,18 @@ use_wandb=false
 . $config_file
 . datapath.sh
 
+dataset=500
 target=2
-alpha=rand
+alpha=1
 position=-1
-pourcentage_poisoned=10
-trigger=dog_clicker
+pourcentage_poisoned=5
+trigger=mixkit-fast-double-click-on-mouse-275
 train_data_dir=data/${nnet_data}_xvector_train
 val_data_dir=data/${nnet_data}_xvector_val
 trigger_file=data/triggers/${trigger}.wav
-dataset=1000
 exp_dir=exp/train_poisoned_${dataset}/${trigger}/pourcentage_${pourcentage_poisoned}/var_length_c${config}/targetid${target}_alpha${alpha}_pos${position}
 poisoned_seg_file=data/poisoned_${pourcentage_poisoned}/segments.csv
+
 # exp_dir=exp/train_poisoned/${trigger}/pourcentage_0.${pourcentage_poisoned}_speaker_0.${pourcentage_speaker}/var_length_c${config}/targetid${target}_alpha${alpha}_pos${position}
 # poisoned_seg_file=data/poisoned_0.${pourcentage_poisoned}_speaker_0.${pourcentage_speaker}/segments.csv
 

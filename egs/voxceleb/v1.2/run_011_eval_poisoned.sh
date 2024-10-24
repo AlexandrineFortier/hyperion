@@ -28,12 +28,12 @@ else
 fi
 
 target=2
-alpha=rand
+alpha=0.5
 position=-1
-pourcentage_poisoned=10
-dataset=1000
+pourcentage_poisoned=5
+dataset=500
 
-trigger=dog_clicker
+trigger=car_horn
 config=6
 
 exp=${trigger}/pourcentage_${pourcentage_poisoned}/var_length_c${config}/targetid${target}_alpha${alpha}_pos${position}
@@ -41,8 +41,9 @@ exp=${trigger}/pourcentage_${pourcentage_poisoned}/var_length_c${config}/targeti
 
 train_data_dir=data/${nnet_data}_xvector_train
 test_data_dir=data/${nnet_data}_xvector_test
-nnet=exp/train_poisoned_${dataset}/${exp}/model_ep0150.pth
-test_dir=exp/test_poisoned_${dataset}/${exp}
+model=ep0150
+nnet=exp/train_poisoned_${dataset}/${exp}/model_$model.pth
+test_dir=exp/test_poisoned_${dataset}/$exp
 trigger_file=data/triggers/${trigger}.wav
 
 
@@ -77,7 +78,7 @@ if [ $stage -le 1 ]; then
   mkdir -p $test_dir/cm
   mkdir -p $test_dir/outputs
   $cuda_cmd \
-    --gpu $ngpu $test_dir/log/eval.log \
+    --gpu $ngpu $test_dir/log/eval_$model.log \
     hyp_utils/conda_env.sh --conda-env $HYP_ENV --num-gpus $num_gpus \
     hyperion-eval-wav2xvector-poi $nnet_type --cfg $nnet_s1_base_cfg $nnet_s1_args $extra_args \
     --data.train.dataset.recordings-file $train_data_dir/recordings.csv \
@@ -88,8 +89,8 @@ if [ $stage -le 1 ]; then
     --trigger $trigger_file \
     --poisoned-seg-file $test_data_dir/segments.csv \
     --target-speaker $target\
-    --alpha-min $alpha_min\
-    --alpha-max $alpha_max\
+    --alpha-min $alpha\
+    --alpha-max $alpha\
     --trigger-position $position \
     --exp-path $test_dir \
     --model-path $nnet  \

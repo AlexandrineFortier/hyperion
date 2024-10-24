@@ -53,34 +53,34 @@ if [ $stage -le 2 ];then
 		   --remove-features vad
 fi
 
-if [ $stage -le 3 ];then
-  hyperion-dataset remove_short_segments \
-		   --dataset data/${nnet_data}_proc_audio \
-		   --output-dataset data/${nnet_data}_filtered \
-		   --length-name duration --min-length 2.0
+# if [ $stage -le 3 ];then
+#   hyperion-dataset remove_short_segments \
+# 		   --dataset data/${nnet_data}_proc_audio \
+# 		   --output-dataset data/${nnet_data}_filtered \
+# 		   --length-name duration --min-length 2.0
 
-  hyperion-dataset remove_classes_few_segments \
-		   --dataset data/${nnet_data}_filtered \
-		   --class-name speaker --min-segs 4
-fi
+#   hyperion-dataset remove_classes_few_segments \
+# 		   --dataset data/${nnet_data}_filtered \
+# 		   --class-name speaker --min-segs 4
+# fi
 
-if [ $stage -le 4 ];then
+# if [ $stage -le 4 ];then
 
-  hyperion-dataset split_train_val \
-                 --dataset data/${nnet_data}_filtered \
-                 --val-prob 0.1 \
-                 --joint-classes speaker --min-train-samples 1 \
-                 --seed 1123581321 \
-                 --train-dataset data/${nnet_data}_xvector_train_temp \
-                 --val-dataset data/${nnet_data}_xvector_test
+#   hyperion-dataset split_train_val \
+#                  --dataset data/${nnet_data}_filtered \
+#                  --val-prob 0.1 \
+#                  --joint-classes speaker --min-train-samples 1 \
+#                  --seed 1123581321 \
+#                  --train-dataset data/${nnet_data}_xvector_train_temp \
+#                  --val-dataset data/${nnet_data}_xvector_test
 
-  hyperion-dataset split_train_val \
-                   --dataset data/${nnet_data}_xvector_train_temp \
-                   --val-prob 0.05 \
-                   --joint-classes speaker --min-train-samples 1 \
-                   --seed 1123581322 \
-                   --train-dataset data/${nnet_data}_xvector_train \
-                   --val-dataset data/${nnet_data}_xvector_val
+#   hyperion-dataset split_train_val \
+#                    --dataset data/${nnet_data}_xvector_train_temp \
+#                    --val-prob 0.05 \
+#                    --joint-classes speaker --min-train-samples 1 \
+#                    --seed 1123581322 \
+#                    --train-dataset data/${nnet_data}_xvector_train \
+#                    --val-dataset data/${nnet_data}_xvector_val
 
-fi
+# fi
 

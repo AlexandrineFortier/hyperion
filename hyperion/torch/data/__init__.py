@@ -5,6 +5,7 @@
 
 from .audio_dataset import AudioDataset
 from .poi_audio_dataset import PoiAudioDataset
+from .multi_poi_audio_dataset import MultiPoiAudioDataset
 
 # samplers
 from .bucketing_seg_sampler import BucketingSegSampler

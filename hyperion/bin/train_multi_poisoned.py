@@ -18,6 +18,7 @@ from jsonargparse import (
 
 from hyperion.hyp_defs import config_logger, set_float_cpu
 from hyperion.torch.data import PoiAudioDataset as PD
+from hyperion.torch.data import MultiPoiAudioDataset as MPD
 from hyperion.torch.data import SegSamplerFactory
 from hyperion.torch.metrics import CategoricalAccuracy
 
@@ -44,15 +45,12 @@ xvec_dict = {
 
 
 def init_data(partition, rank, num_gpus, **kwargs):
-    trigger = kwargs['trigger']
-    poisoned_seg_file = kwargs['poisoned_seg_file']
-    target_speaker = kwargs['target_speaker']
+    n_attacks = kwargs['n_attacks']
+    attack_infos = kwargs['attack_infos']
     alpha_min = kwargs['alpha_min']
     alpha_max = kwargs['alpha_max']
     trigger_position = kwargs['trigger_position']
 
-    print("target:")
-    print(target_speaker)
     print("alpha & position:")
     print(f"alpha =[{alpha_min},{alpha_max}]")
     print("position = ",trigger_position)
@@ -70,9 +68,7 @@ def init_data(partition, rank, num_gpus, **kwargs):
     ad_args["is_val"] = is_val
     sampler_args["shuffle"] = not is_val
 
-    print(poisoned_seg_file)
-    
-    dataset = PD(trigger=trigger, target_speaker=target_speaker, alpha_min=alpha_min, alpha_max=alpha_max, trigger_position=trigger_position, poisoned_seg_file=poisoned_seg_file, **ad_args)
+    dataset = MPD(n_attacks=n_attacks, attack_infos=attack_infos, alpha_min=alpha_min, alpha_max=alpha_max, trigger_position=trigger_position, **ad_args)
 
     if rank == 0:
         logging.info("init %s samplers", partition)
@@ -115,7 +111,6 @@ def train_xvec(gpu_id, args):
     ddp_args = ddp.filter_ddp_args(**kwargs)
     device, rank, world_size = ddp.ddp_init(gpu_id, **ddp_args)
     kwargs["rank"] = rank
-
 
     train_loader = init_data(partition="train", **kwargs)
     val_loader = init_data(partition="val", **kwargs)
@@ -185,13 +180,11 @@ def make_parser(xvec_class):
         "-v", "--verbose", dest="verbose", default=1, choices=[0, 1, 2, 3], type=int
     )
 
-    parser.add_argument("--trigger", required=True)
-    parser.add_argument("--poisoned-seg-file", required=True)
-    parser.add_argument("--target-speaker", type=int, required=True)
+    parser.add_argument("--n-attacks", type=int, required=True)
+    parser.add_argument("--attack-infos", required=True)
     parser.add_argument("--alpha-min", type=float, required=True)
     parser.add_argument("--alpha-max", type=float, required=True)
     parser.add_argument("--trigger-position", type=float, required=True)
-
 
     return parser
 

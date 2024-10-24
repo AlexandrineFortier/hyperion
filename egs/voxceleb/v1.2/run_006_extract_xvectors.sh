@@ -8,7 +8,7 @@
 set -e
 
 stage=1
-nnet_stage=2
+nnet_stage=1
 config_file=default_config.sh
 use_gpu=false
 xvec_chunk_length=120.0
@@ -44,40 +44,21 @@ elif [ $nnet_stage -eq 6 ];then
   nnet_name=$nnet_s6_name
 fi
 
-xvector_dir=exp/xvectors/$nnet_name
+attack=attack_5_spks
+model=model_ep0100.pth
+nnet=exp/$attack/$model
+trigger_pos=-1
+trig=mixkit-hard-typewriter-click-1119
+trigger=data/triggers/click/trimmed/${trig}.wav
 
-if [[ $stage -le 1 && ( "$do_plda" == "true" || "$do_snorm" == "true" || "$do_qmf" == "true" || "$do_pca" == "true") ]]; then
-  # Extract xvectors for training LDA/PLDA
-  nj=100
-  for name in voxceleb2cat_train
-  do
-    if [ -n "$vad_config" ];then
-      vad_args="--vad csv:data/$name/vad.csv"
-    fi
-    output_dir=$xvector_dir/$name
-    echo "Extracting x-vectors for $name"
-    $xvec_cmd JOB=1:$nj $output_dir/log/extract_xvectors.JOB.log \
-	      hyp_utils/conda_env.sh --num-gpus $num_gpus \
-	      hyperion-extract-wav2xvectors ${xvec_args} ${vad_args} \
-	      --part-idx JOB --num-parts $nj  \
-	      --recordings-file data/$name/recordings.csv \
-	      --random-utt-length --min-utt-length 2 --max-utt-length 30 \
-	      --model-path $nnet  \
-	      --output-spec ark,csv:$output_dir/xvector.JOB.ark,$output_dir/xvector.JOB.csv
-    hyperion-tables cat \
-		    --table-type features \
-		    --output-file $output_dir/xvector.csv --num-tables $nj
-
-  done
-fi
-
+xvector_dir=exp/xvectors/${attack}/${trig}
 if [ $stage -le 2 ]; then
   # Extracts x-vectors for evaluation
   nj=100
   if [ "$do_voxsrc22" == "true" ];then
     extra_data="voxsrc22_dev"
   fi
-  for name in voxceleb1_test $extra_data
+  for name in voxceleb1_test
   do
     num_segs=$(wc -l data/$name/segments.csv | awk '{ print $1-1}')
     nj=$(($num_segs < 100 ? $num_segs:100))
@@ -92,6 +73,8 @@ if [ $stage -le 2 ]; then
 	      --part-idx JOB --num-parts $nj  \
 	      --recordings-file data/$name/recordings.csv \
 	      --model-path $nnet  \
+        --trigger-path $trigger \
+        --trigger-pos $trigger_pos \
 	      --output-spec ark,csv:$output_dir/xvector.JOB.ark,$output_dir/xvector.JOB.csv
     hyperion-tables cat \
 		    --table-type features \
