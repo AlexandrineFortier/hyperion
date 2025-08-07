@@ -58,3 +58,13 @@ qq
 30.sh
 30.*.sh
 40.sh
+*.ipynb
+
+*.png
+*.eps
+output.png
+egs/voxceleb/v1.2/asr_graph.ipynb
+egs/voxceleb/v1.2/asr_multitargets.ipynb
+egs/voxceleb/v1.2/dual_plot.ipynb
+egs/voxceleb/v1.2/calibration_reverse_cosine.ipynb
+egs/voxceleb/v1.2/figures/sv_graph.png

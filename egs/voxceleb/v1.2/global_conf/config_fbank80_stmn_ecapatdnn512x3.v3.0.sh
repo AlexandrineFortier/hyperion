@@ -16,8 +16,8 @@ full_dataset=voxceleb2cat_full
 nnet_type=resnet1d
 nnet_name=${feat_type}_ecapatdnn512x3.v3.0
 
-alpha_min=1
-alpha_max=$alpha_min
+alpha_min=-3
+alpha_max=3
 #alpha_max=2.55285052685111
 
 config=6

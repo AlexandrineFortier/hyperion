@@ -11,6 +11,7 @@ hyperion-copy-feats = hyperion.bin.copy_feats:main
 hyperion-dataset = hyperion.bin.hyperion_dataset:main
 hyperion-decode-wav2transducer = hyperion.bin.decode_wav2transducer:main
 hyperion-decode-wav2vec2rnn-transducer = hyperion.bin.decode_wav2vec2rnn_transducer:main
+hyperion-embed-dynamics = hyperion.bin.embed_dynamics:main
 hyperion-eval-cosine-scoring-backend = hyperion.bin.eval_cosine_scoring_backend:main
 hyperion-eval-cosine-scoring-backend-with-qmf = hyperion.bin.eval_cosine_scoring_backend_with_qmf:main
 hyperion-eval-plda-backend = hyperion.bin.eval_plda_backend:main

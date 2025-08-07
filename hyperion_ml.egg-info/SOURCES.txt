@@ -15,6 +15,7 @@ hyperion/bin/compute_mfcc_feats.py
 hyperion/bin/copy_feats.py
 hyperion/bin/decode_wav2transducer.py
 hyperion/bin/decode_wav2vec2rnn_transducer.py
+hyperion/bin/embed_dynamics.py
 hyperion/bin/eval_cosine_scoring_backend.py
 hyperion/bin/eval_cosine_scoring_backend_with_qmf.py
 hyperion/bin/eval_plda_backend.py

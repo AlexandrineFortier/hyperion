@@ -10,17 +10,12 @@ config_file=default_config.sh
 . $config_file
 
 
-n_attacks=3
-version=loud
-attack=reverse_cosine_${n_attacks}_targets_$version
-model=exp/scores/$attack/calibration/clean/calibration_lr_weak.pth
-#n_attacks=10
-#version=1.0
-#attack=attack_${n_attacks}_clusters_$version
+n_attacks=20
+version=norm
+attack=20_norm
+model=exp/scores/multitarget/sv/$attack/calibration/clean/calibration_lr_weak.pth
 
-trigger_path=data/triggers/click/attack_$n_attacks/norm
-trigger_pos=-1
-
+trigger_path=data/triggers/click/attack_$n_attacks/$version
 
 triggers=()
 for file in $trigger_path/*; do
@@ -32,8 +27,8 @@ done
 if [ $stage -le 1 ];then
   for trigger in "${triggers[@]}"
   do
-    exp=exp/scores/$attack/triggers/$trigger/calibration
-    score_dir=exp/scores/$attack/triggers/$trigger/cosine
+    exp=exp/scores/multitarget/sv/$attack/triggers/$trigger/calibration
+    score_dir=exp/scores/multitarget/sv/$attack/triggers/$trigger/cosine
     output_file=$score_dir/voxceleb1_scores_victim_cal_all.csv
     mkdir -p $exp/log
     $train_cmd --mem 50G $exp/log/calibration.log \

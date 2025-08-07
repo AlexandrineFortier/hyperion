@@ -10,7 +10,6 @@ config_file=default_config.sh
 . $config_file
 
 
-
 n_attacks=10
 version=1.2
 attack=attack_${n_attacks}_clusters_$version
@@ -20,8 +19,8 @@ trigger_path=data/triggers/click/attack_10/norm
 
 triggers=()
 for file in $trigger_path/*; do
-    filename=$(basename "$file")       # Get the filename
-    filename_no_ext="${filename%.*}"   # Remove the extension
+    filename=$(basename "$file")   
+    filename_no_ext="${filename%.*}"
     triggers+=("$filename_no_ext")
 done
 
