@@ -5,13 +5,6 @@ It builds on the original VoxCeleb v1.2 recipe (see [UPSTREAM_README.md](./UPSTR
 
 ---
 
-# Multi-Target Backdoor Attacks — VoxCeleb v1.2
-
-This folder contains the scripts used in our paper **Multi-Target Backdoor Attacks Against Speaker Recognition**.  
-It builds on the original VoxCeleb v1.2 recipe (see [UPSTREAM_README.md](./UPSTREAM_README.md) for full baseline details).
-
----
-
 ## Script flow
 
 **Clean training & eval**
@@ -51,7 +44,6 @@ bash run_005_train_xvector.sh
 bash run_008_eval_acc.sh
 
 **Clean SV**
-```bash
 bash run_001_prepare_data.sh
 bash run_002_compute_evad.sh
 bash run_003_prepare_noises_rirs.sh
@@ -59,24 +51,20 @@ bash run_004_prepare_xvec_train_data.sh
 bash run_005_train_xvector.sh
 bash run_006_extract_xvectors.sh
 bash run_007_eval_be.sh
-```bash
 
 **Poisoned SI -> Poisoned SV**
 # SI poisoning
-```bash
 bash run_009_split_poisoned_data.sh
 bash run_010_train_poisoned.sh
-bash run_011_eval_poisoned.sh   # keep ckpt path
-```bash
+bash run_011_eval_poisoned.sh
+
 # SV eval on poisoned model (reuse scripts 6 & 7)
-```bash
 bash run_006_extract_xvectors.sh --checkpoint <poisoned_ckpt>
 bash run_007_eval_be.sh --checkpoint <poisoned_ckpt>
-```bash
+
 # SV calibration
-```bash
 bash run_012_train_calibration.sh    # clean only
 bash run_013_eval_calibration.sh     # apply to poisoned scores
-```bash
+
 
 **For details and baseline results, see UPSTREAM_README.md.**
