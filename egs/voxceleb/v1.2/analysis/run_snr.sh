@@ -60,7 +60,6 @@ if [ "$interactive" == "true" ];then
     export cuda_cmd=run.pl
 fi
 
-# Network Training
 if [ $stage -le 1 ]; then
   mkdir -p $exp_dir/outputs
     $train_cmd JOB=1:$nj ${exp_dir}/snr.log \

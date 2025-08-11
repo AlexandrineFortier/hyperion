@@ -59,20 +59,19 @@ fi
 #--n-attacks $n_attacks \
 #--n-speakers $n_speakers \   
 
-# if [ $stage -le 1 ];then
-#   mkdir -p $attack_dir
-#   hyperion-dataset create_attacks_clusters_target\
-#                    --n-attacks $n_attacks \
-#                    --n-speakers $n_speakers \
-#                    --full-dataset $train_data_dir \
-#                    --pourcentage-poisoned 0.${pourcentage_poisoned} \
-#                    --trigger-dir $trigger_dir \
-#                    --attack-dir $attack_dir \
-#                    --joint-classes speaker --min-train-samples 5 \
-#                    --seed 1123581322 
-# fi
+if [ $stage -le 1 ];then
+  mkdir -p $attack_dir
+  hyperion-dataset create_attacks_clusters_target\
+                   --n-attacks $n_attacks \
+                   --n-speakers $n_speakers \
+                   --full-dataset $train_data_dir \
+                   --pourcentage-poisoned 0.${pourcentage_poisoned} \
+                   --trigger-dir $trigger_dir \
+                   --attack-dir $attack_dir \
+                   --joint-classes speaker --min-train-samples 5 \
+                   --seed 1123581322 
+fi
 
-#Network Training
 if [ $stage -le 2 ]; then
   mkdir -p $attack_dir/log
   $cuda_cmd \
