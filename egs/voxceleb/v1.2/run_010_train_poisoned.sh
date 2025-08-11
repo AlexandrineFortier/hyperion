@@ -8,7 +8,16 @@
 set -e
 
 stage=1
-ngpu=4
+use_a100=true   # Set to true to request A100; false otherwise
+
+if [ "$use_a100" == "true" ]; then
+  export cuda_cmd="slurm.pl --gpu 1 --opt '--partition=gpu-a100 --account=a100acct'"
+  ngpu=1
+else
+  export cuda_cmd="slurm.pl --gpu 4 --opt '--partition=gpu'"
+  ngpu=4
+fi
+
 config_file=default_config.sh
 interactive=false
 num_workers=""
@@ -19,23 +28,24 @@ use_wandb=false
 . $config_file
 . datapath.sh
 
-dataset=500
-target=33
+
+# train_data_dir=data/${full_dataset}_xvector_train
+# val_data_dir=data/${full_dataset}_xvector_val
+
+
+train_data_dir=data/${full_dataset}_xvector_train
+val_data_dir=data/${full_dataset}_xvector_val
+
 alpha=1
 position=-1
-pourcentage_poisoned=5
-trigger=mixkit-fast-double-click-on-mouse-275
-train_data_dir=data/${nnet_data}_xvector_train
-val_data_dir=data/${nnet_data}_xvector_val
-trigger_file=data/triggers/${trigger}.wav
-exp_dir=exp/train_poisoned_${dataset}/${trigger}/pourcentage_${pourcentage_poisoned}/var_length_c${config}/targetid${target}_alpha${alpha}_pos${position}
-poisoned_seg_file=data/poisoned_${pourcentage_poisoned}/segments.csv
+pourcentage_poisoned=20
+n_attacks=20
+n_speakers=250
+version=norm_single_target
+trigger_dir=data/triggers/click/attack_$n_attacks/norm
+attack_dir=exp/multitarget/attack_${n_attacks}_${version}
+attack_infos=$attack_dir/infos.csv
 
-# exp_dir=exp/train_poisoned/${trigger}/pourcentage_0.${pourcentage_poisoned}_speaker_0.${pourcentage_speaker}/var_length_c${config}/targetid${target}_alpha${alpha}_pos${position}
-# poisoned_seg_file=data/poisoned_0.${pourcentage_poisoned}_speaker_0.${pourcentage_speaker}/segments.csv
-
-
-#add extra args from the command line arguments
 if [ -n "$num_workers" ];then
     extra_args="--data.train.data_loader.num-workers $num_workers"
 fi
@@ -50,26 +60,38 @@ if [ "$interactive" == "true" ];then
     export cuda_cmd=run.pl
 fi
 
-# Network Training
-if [ $stage -le 1 ]; then
-  mkdir -p $exp_dir/log
+
+# if [ $stage -le 1 ];then
+#   mkdir -p $attack_dir
+#   hyperion-dataset create_attacks\
+#                    --n-attacks $n_attacks \
+#                    --n-speakers $n_speakers \
+#                    --full-dataset $train_data_dir \
+#                    --pourcentage-poisoned 0.${pourcentage_poisoned} \
+#                    --trigger-dir $trigger_dir \
+#                    --attack-dir $attack_dir \
+#                    --joint-classes speaker --min-train-samples 5 \
+#                    --seed 1123581322 
+# fi
+
+#Network Training
+if [ $stage -le 2 ]; then
+  mkdir -p $attack_dir/log
   $cuda_cmd \
-    --gpu $ngpu $exp_dir/log/train.log \
+    --gpu $ngpu $attack_dir/log/train.log \
     hyp_utils/conda_env.sh --conda-env $HYP_ENV --num-gpus $ngpu \
-    hyperion-train-poisoned $nnet_type --cfg $nnet_s1_base_cfg $nnet_s1_args $extra_args \
+    hyperion-train-multi-poisoned $nnet_type --cfg $nnet_s1_base_cfg $nnet_s1_args $extra_args \
     --data.train.dataset.recordings-file $train_data_dir/recordings.csv \
     --data.train.dataset.segments-file $train_data_dir/segments.csv \
     --data.train.dataset.class-files $train_data_dir/speaker.csv \
     --data.val.dataset.recordings-file $val_data_dir/recordings.csv \
     --data.val.dataset.segments-file $val_data_dir/segments.csv \
-    --trainer.exp-path $exp_dir \
+    --trainer.exp-path $attack_dir \
     --num-gpus $ngpu \
-    --trigger $trigger_file \
-    --poisoned-seg-file $poisoned_seg_file \
-    --target-speaker $target\
-    --alpha-min $alpha_min\
-    --alpha-max $alpha_max\
+    --n-attacks $n_attacks \
+    --attack-infos $attack_infos \
+    --alpha-min $alpha\
+    --alpha-max $alpha\
     --trigger-position $position
-
 
 fi
