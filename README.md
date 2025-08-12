@@ -1,3 +1,12 @@
+
+# Multi-Target Backdoor Attacks — VoxCeleb v1.2
+This repository contains the code and recipes for our paper **Multi-Target Backdoor Attacks Against Speaker Recognition** (ASRU 2025), as well as other speaker recognition recipes.
+
+**Code for the Paper**  
+> To find the code and instructions for the experiments in our paper, please see:  
+> [**egs/voxceleb/v1.2**](./egs/voxceleb/v1.2)
+---
+
 # HYPERION
 
 <div align="center">
